@@ -1,0 +1,1 @@
+from abc import ABC, abstractmethodclass Store(ABC):    """    A very broad class, mainly used to assist research and development in the execution process of conversational    applications. Store some very important variables and methods in the objects of the current class    """    pass

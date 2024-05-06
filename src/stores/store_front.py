@@ -1,0 +1,1 @@
+from src.base.store import Storeclass StoreFront(Store):    """    前端交互界面的逻辑与数据存储类    """    def __init__(self):        self.robot_name = '王雪凝'        self.key_values = {}        self.stage = 'greeting'        self.received_info = None

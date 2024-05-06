@@ -1,0 +1,1 @@
+from src.apps.app_qw import AppQWapp_qw = AppQW(application_name='企微新签',               port=18868,               model_name='gpt-35-turbo-1106')app_qw.run()
