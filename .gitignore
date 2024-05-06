@@ -16,4 +16,3 @@ data/json/*.json
 !data/log/
 !data/json/
 request_knowledge.py
-src/config.py
