@@ -18,31 +18,12 @@ from src.base.utils import test
 # }
 # }
 
-# if __name__ == '__main__':
-#     # Execute the `test` function with specified parameters.
-#     # Replace the empty strings and lists with the appropriate values for your use case.
-#     test(url='http://127.0.0.1:18868/chat',
-#          test_json_file='data/json/test.json',
-#          test_case_keys=["http联通性测试"],
-#          test_case_prefixs=[],
-#          result_path='data/result',
-#          batch_size=3)
-
-
-
-import os
-
-def list_files(startpath):
-    for root, dirs, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        if not root.startswith('_') and not root.endswith('_'):
-            print(f'{indent}{os.path.basename(root)}/')
-        subindent = ' ' * 4 * (level + 1)
-        for f in files:
-            if f.endswith('.py') and not f.startswith('_'):
-                print(f'{subindent}{f}')
-
 if __name__ == '__main__':
-    project_path = 'src/'
-    list_files(project_path)
+    # Execute the `test` function with specified parameters.
+    # Replace the empty strings and lists with the appropriate values for your use case.
+    test(url='http://127.0.0.1:18868/chat',
+         test_json_file='data/json/test.json',
+         test_case_keys=["http联通性测试"],
+         test_case_prefixs=[],
+         result_path='data/result',
+         batch_size=3)
