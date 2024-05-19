@@ -9,6 +9,7 @@
 
 ### 模块及API介绍
 - [对话生命周期理念介绍](#对话生命周期理念介绍)
+- [接口调用顺序介绍](#接口调用顺序图)
 - [ChatApplication-后台核心应用类](#class-chatapplication)
     - [init-构造函数](#def__init__)
     - [set_store_class-设定逻辑与数据寄存器的类](#def-set_store_class-须用户继承实现)
