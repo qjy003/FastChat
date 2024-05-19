@@ -951,7 +951,7 @@ asyncio.run(request_log(urls=['http://127.0.0.1:18868/log'],
 
 ### 本地运行
 
-运行以下`shell`脚本在本地启动本系统. 推荐您使用Python3.9+以上版本
+运行以下`shell`脚本在本地启动本系统. 推荐您使用Python3.8版本(与在线部署环境一致)
 
 ```shell
 # # run conda, venv ... to create and activate virtual environment
