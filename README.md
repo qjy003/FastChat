@@ -71,7 +71,7 @@
     - [update_store-更新逻辑与数据寄存器对象](#def-update_store-须用户继承实现-2)
     - [process_inference_results-处理后台核心应用返回的结果](#def-process_inference_results须用户继承实现)
 - [Store-逻辑与数据寄存器类](#class-store-srcbasestorepy)
-- [PrivateModel-私有化部署大模型模块](#class-privatemodel-srcbaseprivate)
+- [PrivateModel-私有化部署大模型模块](#class-privatemodel-srcbaseprivatepy)
   - [inference-私有化部署大模型的推理过程](#def-inference-须用户继承实现)
 ### 其它
 - [批量测试功能](#批量测试功能)
