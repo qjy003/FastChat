@@ -71,6 +71,8 @@
     - [update_store-更新逻辑与数据寄存器对象](#def-update_store-须用户继承实现-2)
     - [process_inference_results-处理后台核心应用返回的结果](#def-process_inference_results须用户继承实现)
 - [Store-逻辑与数据寄存器类](#class-store-srcbasestorepy)
+- [PrivateModel-私有化部署大模型模块](#class-privatemodel-srcbaseprivate)
+  - [inference-私有化部署大模型的推理过程](#def-inference-须用户继承实现)
 ### 其它
 - [批量测试功能](#批量测试功能)
 - [日志查服务](#日志查询功能)
@@ -485,12 +487,14 @@ async def evaluate(self,
 ```python
 def __init__(self,
              model_name: str = None,
+             model: Type[PrivateModel] = None,
              temperature: float = None,
              openai_api_key: str = None,
              verbose: bool = None):
     """
     Args:
         model_name: 当前模块指定使用的大模型的名称标识(未指定时使用核心应用配置的大模型)
+        model: 当前模块指定使用的私有化部署大模型的类
         temperature: 大模型的温度值(未指定时使用核心应用配置的温度值)
         openai_api_key: 访问大模型api接口的密钥
         verbose: 可忽略该参数
@@ -649,12 +653,14 @@ def process_query_results(self, query_content: str, query_results: list) -> Any:
 ```python
 def __init__(self,
              model_name: str = None,
+             model: Type[PrivateModel] = None,
              temperature: float = None,
              openai_api_key: str = None,
              verbose: bool = None):
     """
     Args:
         model_name: 当前模块指定使用的大模型的名称标识(未指定时使用核心应用配置的大模型)
+        model: 当前模块指定使用的私有化部署大模型的类
         temperature: 大模型的温度值(未指定时使用核心应用配置的温度值)
         openai_api_key: 访问大模型api接口的密钥
         verbose: 可忽略该参数
@@ -727,12 +733,14 @@ def setup(self,
 ```python
 def __init__(self,
              model_name: str = None,
+             model: Type[PrivateModel] = None,
              temperature: float = None,
              openai_api_key: str = None,
              verbose: bool = None):
     """
     Args:
         model_name: 当前模块指定使用的大模型的名称标识(未指定时使用核心应用配置的大模型)
+        model: 当前模块指定使用的私有化部署的大模型的类
         temperature: 大模型的温度值(未指定时使用核心应用配置的温度值)
         openai_api_key: 访问大模型api接口的密钥
         verbose: 可忽略该参数
@@ -895,6 +903,21 @@ def process_inference_results(self,
 
 ### class Store (src/base/store.py)
 逻辑与数据寄存器，为前端与后台核心应用提供所需要的用于存储数据，以及执行方法。本类是一个没有任何属性定义和方法定义的抽象类，为研发人员提供了极大的自由空间。研发人员在Store的子类当中定义任意需要的变量和方法，你可以在后台核心应用执行的特定回调方法当中使用你实现的Store子类当中的属性变量和方法。
+
+
+### class PrivateModel (src/base/private.py)
+研发部署的开源大模型类，仅须研发实现接口inference方法，该方法完成基于给定的提示词内容来生成相应的推理结果，并将生成的推理结果返回即可。
+
+#### def inference (须用户继承实现)
+```python
+def inference(self, prompt:str) -> str:
+    """
+    Args:
+        prompt: 提示词内容
+    Returns:
+        私有化部署的模型通过推理所得到的推理结果
+    """
+```
 
 ## 批量测试功能
 
