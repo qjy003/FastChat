@@ -21,7 +21,6 @@
     - [add_front_interface-添加前端交互模块](#def-add_front_interface)
     - [add_http_interface-添加http服务接口模块](#def-add_http_interface)
     - [add_query_module-添加知识查询模块](#def-add_query_module)
-    - [disable_module-设置模块失活](#def-disable_module)
     - [think-执行推理思考](#def-think)
     - [query-执行知识查询](#def-query)
     - [reply-执行对话回复](#def-reply)
@@ -244,19 +243,6 @@ def add_query_module(self,
         black_list: 当前模块不允许执行的对话阶段列表，在未指定的对话阶段内执行
         
         white_list和black_list均未指定时，该模块在所有对话阶段内均执行        
-    """
-```
-
-#### def disable_module
-执行设定相应的模块在本次请求当中不执行，该模块对应的输出结果为None值
-```python
-def disable_module(self,
-                   module_type: str,
-                   module_name: str = None):
-    """
-    Args:
-        module_type: 指定本次失活的模块的类型
-        module_name: 指定本次失活的模块的名称
     """
 ```
 
