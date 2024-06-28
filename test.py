@@ -26,4 +26,4 @@ if __name__ == '__main__':
          test_case_keys=["http联通性测试"],
          test_case_prefixs=[],
          result_path='data/result',
-         batch_size=3)
+         batch_size=10)
