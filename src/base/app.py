@@ -1,9 +1,10 @@
 import inspect
 import asyncio
 import os
+import random
 from fastapi import FastAPI
 from abc import ABC, abstractmethod, ABCMeta
-from typing import List
+from typing import List, Type
 from typing import Any
 from typing import Union, Tuple, Dict, Callable
 from src.base.think import ThinkModule
@@ -34,7 +35,7 @@ from src.base.http import HttpInterface
 from src.base.utils import add_call_func_2_log
 from src.base.utils import add_call_async_func_2_log
 from src.base.utils import then_call_async_func
-from src.base.openai import MyChatOpenAI
+from src.base.private import PrivateModel
 from src.base.service import LogHttpService
 
 
@@ -138,7 +139,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                  port: int = PORT,
                  openai_api_key: str = AZURE_OPENAI_API_KEY,
                  model_name: str = None,
-                 model: MyChatOpenAI = None,
+                 model: Type[PrivateModel] = None,
                  temperature: float = 0,
                  verbose: bool = False):
         """
@@ -765,8 +766,10 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                 llm = llms.get(getattr(module, 'model').__name__, None)
                 module.setup(llm=llm, verbose=self.verbose)
                 continue
-            if self.gpt_model_name is None and getattr(module, 'model_name') is None:
-                module.setup(llm=self.gpt_model, verbose=self.verbose)
+            if self.gpt_model_name is None and getattr(module, 'model_name', None) is None:
+                if not self.gpt_model.__name__ not in llms:
+                    llms[self.gpt_model.__name__] = self.gpt_model()
+                module.setup(llm=llms[self.gpt_model.__name__], verbose=self.verbose)
                 continue
             llm_key = (getattr(module, 'model_name', self.gpt_model_name),
                        getattr(module, 'temperature', self.temperature),
