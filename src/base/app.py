@@ -137,7 +137,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     def __init__(self,
                  application_name: str = 'dialog app',
                  port: int = PORT,
-                 openai_api_key: str = AZURE_OPENAI_API_KEY,
+                 openai_api_key: str = random.choice(AZURE_OPENAI_API_KEY),
                  model_name: str = None,
                  model: Type[PrivateModel] = None,
                  temperature: float = 0,
@@ -490,6 +490,10 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         # Update the current original chat stage with the inference results.
         original_stage = self.update_original_chat_stage(inference_inputs=kwargs, store=store)
 
+        # filter the unused think modules
+        think_and_query_inputs = self.get_avaliable_think_and_query_modules(think_and_query_inputs=think_and_query_inputs,
+                                                                            current_stage=original_stage)
+        
         # Perform the thinking and knowledge querying.
         think_results, query_results = await self._think_and_query(**think_and_query_inputs)
 
@@ -658,6 +662,40 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     from abc import abstractmethod
 
+    def get_avaliable_think_and_query_modules(self,
+                                              think_and_query_inputs: dict,
+                                              current_stage: str)->dict:
+        """get the avaliable think and query modules 
+
+        Args:
+            think_and_query_inputs (dict): the inputs to the think and query module
+
+        Returns:
+            _type_: the filtered think_and_query_inputs
+        """
+        filter_results = {}
+        for module_name, module_input in think_and_query_inputs.items():
+            if module_name in self.think_modules:
+                white_list = getattr(self.think_modules.get(module_name),'white_list', None)
+                black_list = getattr(self.think_modules.get(module_name),'black_list', None)
+            elif module_name in self.query_modules:
+                white_list = getattr(self.think_modules.get(module_name),'white_list', None)
+                black_list = getattr(self.think_modules.get(module_name),'black_list', None)
+            else:
+                continue
+            if white_list is not None and black_list is not None and\
+               (current_stage in black_list or current_stage not in white_list):
+                continue
+            if white_list is not None and current_stage not in white_list:
+                continue
+            if black_list is not None and current_stage in black_list:
+                continue
+            filter_results[module_name] = module_input
+        return filter_results
+                
+                
+    
+    
     @abstractmethod
     def process_inference_results(self,
                                   evaluate_results: Dict,
