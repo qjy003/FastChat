@@ -767,7 +767,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                 module.setup(llm=llm, verbose=self.verbose)
                 continue
             if self.gpt_model_name is None and getattr(module, 'model_name', None) is None:
-                if not self.gpt_model.__name__ not in llms:
+                if self.gpt_model.__name__ not in llms:
                     llms[self.gpt_model.__name__] = self.gpt_model()
                 module.setup(llm=llms[self.gpt_model.__name__], verbose=self.verbose)
                 continue
