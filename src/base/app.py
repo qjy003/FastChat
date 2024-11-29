@@ -37,7 +37,9 @@ from src.base.utils import add_call_async_func_2_log
 from src.base.utils import then_call_async_func
 from src.base.private import PrivateModel
 from src.base.service import LogHttpService
-
+from src.base.es_log import Logger as ESLogger
+from src.base.es_service import ESLogHttpService
+from src.config import *
 
 class DecorateAllMethods(type):
     """A metaclass that decorates all methods of a subclass.
@@ -824,6 +826,11 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             self.app = FastAPI()
         log_http_service = LogHttpService()
         self.add_http_interface(log_http_service, path='/log', module_name='日志查询服务')
+        if len(Elasticsearch_Params) > 0 and Elasticsearch_Table != "" and os.environ.get('JD_ONLINE_PORT', '') != "":
+            es_logger = ESLogger(Elasticsearch_Table, Elasticsearch_Params)
+            if es_logger.create_table():
+                es_log_http_service = ESLogHttpService()
+                self.add_http_interface(es_log_http_service, path='/es_log', module_name='ES日志查询服务')
         for module_name, module in self.http_interfaces.items():
             module.initialize_interface()
             self.app.include_router(module)
