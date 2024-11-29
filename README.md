@@ -75,6 +75,7 @@
 ### 其它
 - [批量测试功能](#批量测试功能)
 - [日志查服务](#日志查询功能)
+  - [ES永久日志服务使用](#ES永久日志查询)
 - [部署方式](#部署)
     - [容器/行云部署](#容器部署)
     - [本地运行](#本地运行)
@@ -952,6 +953,20 @@ asyncio.run(request_log(urls=['http://127.0.0.1:18868/log'],
                             time_zone=('2024-04-29 23:38:00', '2024-04-30 00:30:00'),
                             query_contents=["特斯拉", "inference"]))
 ```
+
+### ES永久日志查询
+
+#### 配置ES系统参数
+在项目当中的src/config.py文件当中，将ES系统的信息配置在变量Elasticsearch_Params当中，以及指定ES系统当中表格的名称Elasticsearch_Table。
+#### 执行搜索
+在`request_log.py`文件当中的将url的后缀修改为`/es_log`即可针对搜索ES系统当中的日志数据。例如下面所示的方式。
+
+```python
+asyncio.run(request_log(urls=['http://127.0.0.1:18868/es_log'],
+                            time_zone=('2024-04-29 23:38:00', '2024-04-30 00:30:00'),
+                            query_contents=["特斯拉", "inference"]))
+```
+
 
 ## 部署
 
