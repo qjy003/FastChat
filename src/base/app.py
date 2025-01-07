@@ -41,6 +41,7 @@ from src.base.es_log import Logger as ESLogger
 from src.base.es_service import ESLogHttpService
 from src.config import *
 
+
 class DecorateAllMethods(type):
     """A metaclass that decorates all methods of a subclass.
 
@@ -85,9 +86,9 @@ class DecorateAllMethods(type):
                 if attr == 'gen_reply_inputs':
                     dct[attr] = return_type_must_belong([Dict, str])(add_call_func_2_log(value))
                 if attr == 'gen_evaluate_inputs':
-                    dct[attr] = return_type_must_belong([Dict, str])(add_call_func_2_log(value))
+                    dct[attr] = return_type_must_belong([Dict, str, int])(add_call_func_2_log(value))
                 if attr == 'gen_think_and_query_inputs':
-                    dct[attr] = return_type_must_be(Dict)(value)
+                    dct[attr] = return_type_must_belong([Dict, list])(value)
                 if attr == 'request_preprocess':
                     # dct[attr] = convert_async_2_normal(async_then_call_func(async_return_type_must_be_callable(
                     #                         add_call_async_func_2_log(value))))
@@ -328,8 +329,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     @abstractmethod
     def update_chat_stage(self,
                           store: Store,
-                          think_results: Any,
-                          query_results: Any,
+                          think_results: Union[Dict, list],
+                          query_results: Union[Dict, list],
                           original_chat_stage: str,
                           inference_inputs: Any):
         """
@@ -486,25 +487,51 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         # load the store
         self.load_store(inference_inputs=kwargs, store=store)
 
-        # Generate inputs required for the thinking and querying modules.
-        think_and_query_inputs = self.gen_think_and_query_inputs(store=store, inference_inputs=kwargs)
-
         # Update the current original chat stage with the inference results.
         original_stage = self.update_original_chat_stage(inference_inputs=kwargs, store=store)
 
-        # filter the unused think modules
-        think_and_query_inputs = self.get_avaliable_think_and_query_modules(think_and_query_inputs=think_and_query_inputs,
-                                                                            current_stage=original_stage)
-        
+        # Generate inputs required for the thinking and querying modules.
+        think_and_query_inputs = self.gen_think_and_query_inputs(store=store, inference_inputs=kwargs)
+
         # Perform the thinking and knowledge querying.
-        think_results, query_results = await self._think_and_query(**think_and_query_inputs)
+        if isinstance(think_and_query_inputs, dict):
+            # filter the unused think modules
+            think_and_query_inputs = self.get_avaliable_think_and_query_modules(
+                think_and_query_inputs=think_and_query_inputs,
+                current_stage=original_stage)
+            think_results, query_results = await self._think_and_query(**think_and_query_inputs)
+        elif isinstance(think_and_query_inputs, list) and len(think_and_query_inputs) > 0:
+            # filter the unused think modules
+            rounds = len(think_and_query_inputs)
+            think_results = []
+            query_results = []
+            for i in range(rounds):
+                if i != 0:
+                    # Generate inputs required for the thinking and querying modules.
+                    think_and_query_inputs = self.gen_think_and_query_inputs(store=store,
+                                                                             inference_inputs=kwargs,
+                                                                             think_results=think_results,
+                                                                             query_results=query_results,
+                                                                             current_round_index=i)
+
+                # filter the unused think modules
+                think_and_query_input = self.get_avaliable_think_and_query_modules(
+                    think_and_query_inputs=think_and_query_inputs,
+                    current_stage=original_stage,
+                    current_round_index=i)
+                cur_think_results, cur_query_results = await self._think_and_query(**think_and_query_input)
+                think_results.append(cur_think_results)
+                query_results.append(cur_query_results)
+        else:
+            think_results = {}
+            query_results = {}
 
         # Update the global store object with the new results.
-        self.update_store(store=store,
-                          think_results=think_results,
-                          query_results=query_results,
-                          original_chat_stage=original_stage,
-                          inference_inputs=kwargs)
+        store = self.update_store(store=store,
+                                  think_results=think_results,
+                                  query_results=query_results,
+                                  original_chat_stage=original_stage,
+                                  inference_inputs=kwargs)
 
         # Update the chat stage based on the new store and results.
         current_stage = self.update_chat_stage(store=store,
@@ -538,7 +565,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                                                    query_results=query_results,
                                                    original_chat_stage=original_stage,
                                                    inference_inputs=kwargs)
-        if isinstance(chat_module_inputs, dict):
+        if isinstance(evaluate_inputs, dict):
             evaluate_results = await self._evaluate(**evaluate_inputs)
         else:
             evaluate_results = evaluate_inputs
@@ -561,8 +588,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                             reply_results: Any,
                             current_chat_stage: str,
                             store: Store,
-                            think_results: Dict,
-                            query_results: Dict,
+                            think_results: Union[Dict, list],
+                            query_results: Union[Dict, list],
                             original_chat_stage: str,
                             inference_inputs: Dict
                             ) -> Any:
@@ -665,28 +692,33 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     from abc import abstractmethod
 
     def get_avaliable_think_and_query_modules(self,
-                                              think_and_query_inputs: dict,
-                                              current_stage: str)->dict:
-        """get the avaliable think and query modules 
+                                              think_and_query_inputs: Union[dict, list],
+                                              current_stage: str,
+                                              current_round_index: int = 0) -> dict:
+        """get the avaliable think and query modules
 
         Args:
             think_and_query_inputs (dict): the inputs to the think and query module
+            current_stage (str): Current conversation stage
+            current_round_index (int): Current thinking chain reasoning round
 
         Returns:
             _type_: the filtered think_and_query_inputs
         """
+        think_and_query_inputs = think_and_query_inputs if isinstance(think_and_query_inputs, dict) else \
+            think_and_query_inputs[current_round_index]
         filter_results = {}
         for module_name, module_input in think_and_query_inputs.items():
             if module_name in self.think_modules:
-                white_list = getattr(self.think_modules.get(module_name),'white_list', None)
-                black_list = getattr(self.think_modules.get(module_name),'black_list', None)
+                white_list = getattr(self.think_modules.get(module_name), 'white_list', None)
+                black_list = getattr(self.think_modules.get(module_name), 'black_list', None)
             elif module_name in self.query_modules:
-                white_list = getattr(self.think_modules.get(module_name),'white_list', None)
-                black_list = getattr(self.think_modules.get(module_name),'black_list', None)
+                white_list = getattr(self.think_modules.get(module_name), 'white_list', None)
+                black_list = getattr(self.think_modules.get(module_name), 'black_list', None)
             else:
                 continue
-            if white_list is not None and black_list is not None and\
-               (current_stage in black_list or current_stage not in white_list):
+            if white_list is not None and black_list is not None and \
+                    (current_stage in black_list or current_stage not in white_list):
                 continue
             if white_list is not None and current_stage not in white_list:
                 continue
@@ -694,18 +726,15 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                 continue
             filter_results[module_name] = module_input
         return filter_results
-                
-                
-    
-    
+
     @abstractmethod
     def process_inference_results(self,
                                   evaluate_results: Dict,
                                   reply_results: Any,
                                   current_chat_stage: str,
                                   store: Store,
-                                  think_results: Dict,
-                                  query_results: Dict,
+                                  think_results: Union[Dict, list],
+                                  query_results: Union[Dict, list],
                                   original_chat_stage: str,
                                   inference_inputs: Dict) -> Any:
         """
@@ -1127,8 +1156,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     @abstractmethod
     def update_store(self,
                      store: Store,
-                     think_results: Dict,
-                     query_results: Dict,
+                     think_results: Union[Dict, list],
+                     query_results: Union[Dict, list],
                      original_chat_stage: str,
                      inference_inputs: Dict) -> Store:
         """
@@ -1156,8 +1185,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     def gen_reply_inputs(self,
                          current_chat_stage: str,
                          store: Store,
-                         think_results: Dict,
-                         query_results: Any,
+                         think_results: Union[Dict, list],
+                         query_results: Union[Dict, list],
                          original_chat_stage: str,
                          inference_inputs: Dict) -> Dict:
         """
@@ -1284,7 +1313,12 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         return format_results
 
     @abstractmethod
-    def gen_think_and_query_inputs(self, store: Store, inference_inputs: Dict) -> Dict:
+    def gen_think_and_query_inputs(self,
+                                   store: Store,
+                                   inference_inputs: Dict,
+                                   think_results: Union[Dict, list] = [],
+                                   query_results: Union[Dict, list] = [],
+                                   current_round_index: int = 0) -> Union[Dict, list]:
         """
         Generates the actual values or parameter values for placeholders required by the thinking inference module and
         the knowledge query module.
@@ -1292,6 +1326,9 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         Args:
             store: The storage of key values and attributes.
             inference_inputs: The parameters passed to the inference method.
+            think_results: The reasoning results of the thinking module that have been obtained so far
+            query_results: The results currently queried by the knowledge base query module
+            current_round_index: The current round of the thought chain task
 
         Returns:
             Dict: A dictionary containing the actual values or parameter values for the placeholders.
