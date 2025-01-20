@@ -64,6 +64,10 @@
     - [define_request_format-接口请求数据的格式定义](#def-define_request_format-须用户继承实现)
     - [gen_request-生成请求后台核心应用的参数](#def-gen_request-须用户继承实现)
     - [process_inference_results-处理后台核心应用返回的结果](#def-process_inference_results-须用户继承实现-2)
+- [HttpBackendInterface-http后台任务服务接口模块](#class-httpbackendinterface-srcbasehttp_backendpy)
+    - [define_request_format-接口请求数据的格式定义](#def-process_inference_results-须由用户继承实现-4)
+    - [gen_request-生成请求后台核心应用的参数](#def-gen_request-须用户继承实现)
+    - [process_inference_results-处理后台核心应用返回的结果](#def-process_inference_results-须用户继承实现-3)
 - [FrontInterface-前端交互模块](#class-frontinterface-srcbasefrontpy)
     - [set_store_class-设置逻辑与数据寄存类](#def-set_store_class须用户继承实现)
     - [gen_request-生成请求后台核心应用的参数](#def-gen_request-须用户继承实现-2)
@@ -793,6 +797,43 @@ def setup(self,
 ```
 
 ### class HttpInterface (src/base/http.py)
+http接口服务模块，可便捷部署http接口服务
+
+#### def define_request_format （须用户继承实现）
+定义http接口服务的接口请求的数据格式
+```python
+def define_request_format(self) -> type:
+    """
+    Returns:
+        继承自BaseModel的类
+    """
+```
+
+#### def gen_request (须用户继承实现)
+处理http服务接口接收到的网络请求，处理返回的结果作为请求核心应用的参数
+```python
+def gen_request(self, req: Dict) -> Dict:
+    """
+    Args:
+        req: 接口的网络请求数据
+    Returns:
+        向对话核心应用转发的请求参数
+    """
+```
+
+#### def process_inference_results (须用户继承实现)
+处理核心应用接收请求后执行的结果，处理后的结果作为http服务接口最终返回的结果
+```python
+def process_inference_results(self, inference_results: Any) -> Any:
+    """
+    Args:
+        inference_results: 核心应用推理并返回的结果
+    Returns:
+        http服务接口最终返回的结果
+    """
+```
+
+### class HttpBackendInterface (src/base/http.py)
 http接口服务模块，可便捷部署http接口服务
 
 #### def define_request_format （须用户继承实现）

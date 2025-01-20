@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod, ABCMeta
 from typing import List, Type
 from typing import Any
 from typing import Union, Tuple, Dict, Callable
+
+from src.base.http_backend import HttpBackendInterface
 from src.base.think import ThinkModule
 from src.base.reply import ReplyModule
 from src.base.front import FrontInterface
@@ -166,6 +168,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         self.reply_modules = {}  # Stores reply modules with their configurations
         self.think_modules = {}  # Stores think modules with their configurations
         self.http_interfaces = {}  # Stores HTTP interface configurations
+        self.http_backend_interfaces = {}  # Stores HTTP Backend task interface configurations
         self.front_interfaces = {}  # Stores frontend interface configurations
         self.key_values = {}  # Generic storage for key-value pairs
         self.temperature = temperature  # Temperature setting for the GPT model
@@ -863,7 +866,9 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         for module_name, module in self.http_interfaces.items():
             module.initialize_interface()
             self.app.include_router(module)
-
+        for module_name, module in self.http_backend_interfaces.items():
+            module.initialize_interface()
+            self.app.include_router(module)
         for module_name, module in self.front_interfaces.items():
             self.app = module.setup_app(self.app)
 
@@ -1522,3 +1527,50 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     #             if module_name not in self.evaluate_modules:
     #                 raise ValueError(f"the module name {module_name} not exists in the evaluate_modules.")
     #             setattr(self.evaluate_modules.get(module_name), 'is_disable', True)
+
+    def add_http_backend_interface(self, http_interface: HttpBackendInterface, path: str, module_name: str = None):
+        """
+        Adds an HTTP interface module to the chat application.
+
+        This method incorporates an HTTP interface module into the chat application,
+        assigning it a URL path and an optional module name for identification.
+
+        Args:
+            http_interface (HttpInterface): The HTTP interface module to be added.
+            path (str): The URL path for the HTTP service interface. It must be a string
+                that starts with a forward slash ('/').
+            module_name (str, optional): The name identifier for the HTTP interface module.
+                If not provided, the name of the class file will be used by default.
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: If the provided `url_path` does not start with a forward slash ('/').
+
+        """
+        # Check that the http_interface is an instance of HttpInterface.
+        check_variable_type(http_interface, HttpBackendInterface)
+
+        # Check that the path is a string.
+        check_variable_type(path, str)
+
+        # Ensure the URL path starts with a forward slash.
+        if not path.startswith('/'):
+            raise ValueError(f"{path} must start with '/'.")
+
+        # If no module name is provided, use the name of the class file.
+        if module_name is None:
+            module_name = inspect.getfile(http_interface.__class__)
+
+        if path in self.paths:
+            raise ValueError(f"the path {path} is duplicated, please choose a different one.")
+        self.paths.append(path)
+        # Store the http_interface with its module_name in the dictionary.
+        self.http_backend_interfaces[module_name] = http_interface
+
+        # Set attributes on the http_interface object for later reference.
+        setattr(http_interface, 'chat_application', self)
+        setattr(http_interface, 'module_name', module_name)
+        setattr(http_interface, 'application_name', self.application_name)
+        setattr(http_interface, 'path', path)
