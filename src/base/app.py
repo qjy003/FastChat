@@ -90,7 +90,7 @@ class DecorateAllMethods(type):
                 if attr == 'gen_evaluate_inputs':
                     dct[attr] = return_type_must_belong([Dict, str, int])(add_call_func_2_log(value))
                 if attr == 'gen_think_and_query_inputs':
-                    dct[attr] = return_type_must_belong([Dict, list])(value)
+                    dct[attr] = return_type_must_belong([Dict, list, str])(value)
                 if attr == 'request_preprocess':
                     # dct[attr] = convert_async_2_normal(async_then_call_func(async_return_type_must_be_callable(
                     #                         add_call_async_func_2_log(value))))
