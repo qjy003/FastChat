@@ -142,7 +142,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     def __init__(self,
                  application_name: str = 'dialog app',
                  port: int = PORT,
-                 openai_api_key: str = random.choice(AZURE_OPENAI_API_KEY),
+                 openai_api_key: str = random.choice(
+                     [AZURE_OPENAI_API_KEY] if isinstance(AZURE_OPENAI_API_KEY, str) else AZURE_OPENAI_API_KEY),
                  model_name: str = None,
                  model: Type[PrivateModel] = None,
                  temperature: float = 0,
