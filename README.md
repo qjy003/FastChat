@@ -77,6 +77,7 @@
 - [PrivateModel-私有化部署大模型模块](#class-privatemodel-srcbaseprivatepy)
   - [inference-私有化部署大模型的推理过程](#def-inference-须用户继承实现)
 ### 其它
+- [支持多模态提示词](#支持多模态提示词)
 - [批量测试功能](#批量测试功能)
 - [日志查服务](#日志查询功能)
   - [ES永久日志服务使用](#es永久日志查询)
@@ -945,6 +946,29 @@ def inference(self, prompt:str) -> str:
     Returns:
         私有化部署的模型通过推理所得到的推理结果
     """
+```
+## 支持多模态提示词
+在ThinkModule、ReplyModule当中编写提示词时，我们目前支持通过`{variable:image}`这种方式来标识variable这个变量为图片数据，可以参考下面示例，我们在提示词当中引入了`demo`这个图片数据类型的变量
+```python
+class UnderstandImage(ThinkModule):
+
+    def initialize_prompt(self) -> str:
+        return """
+        请你描述一下下面的图片的内容{demo:image}
+        """
+
+    def process_inference_results(self, inference_results: Any) -> Any:
+        return inference_results
+```
+然后你可以参考下面的示例来执行为变量`demo`的实际赋值，直接将图片的二进制数据赋值到demo字段即可。
+```python
+image_demo = image_to_base64(image_path="image/assistant.png")
+
+        return {
+            "demo": {
+                "demo": image_demo
+            }
+        }
 ```
 
 ## 批量测试功能
