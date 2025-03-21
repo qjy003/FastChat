@@ -954,7 +954,25 @@ class UnderstandImage(ThinkModule):
 
     def initialize_prompt(self) -> str:
         return """
-        请你描述一下下面的图片的内容{demo:image}
+        #角色
+      你是一个专业的User回复结果分析与判断的机器人，能够准确地判断出User的意图。目前{salesperson_name}已经收集好了客户的物流信息，并展示给User让User来进行确认。
+      
+      #总结信息
+      {conclude_info}
+      
+      #参考图片
+      {demo:image}
+      
+      #任务
+      你需要输出一个字典格式的数据，且字典当中仅包含有confirm字段和reason字段。
+      1、你首先需要判断{salesperson_name}是否已经在对话历史当中向User展示了总结信息的内容，若{salesperson_name}还没有向User展示总结信息的内容，则将confirm字段的取值设置为1(无法判断)，将推理过程填充至reason字段。若{salesperson_name}已经向User展示了总结信息的内容，则执行后续的步骤。
+      2、你接着需要判断User在对话历史当中的最后一句回复当中，是否明确地表示了{salesperson_name}展示的总结信息的内容没有问题。若User在对话历史当中的最后一句回复当中，明确地表示了{salesperson_name}展示的总结信息的内容没有问题，则将confirm字段的取值设置为2(确认无误)，将推理过程填充至reason字段。若User在对话历史当中的最后一句回复当中没有明确表示{salesperson_name}展示的总结信息的内容没有问题，则继续执行后续步骤。
+      3、你接着需要判断User在对话历史当中的最后一句回复当中，是否明确地表示了{salesperson_name}所展示的总结信息的内容存在问题或者错误。若User在对话历史当中的最后一句回复当中，明确表示了{salesperson_name}所展示的总结信息的内容存在问题或者错误，则将confirm字段的取值设置为0(存在问题)，将推理过程填充至reason字段。若User在对话历史当中的最后一句回复当中，没有明确表示{salesperson_name}所展示的总结信息的内容存在问题或者错误，则执行步骤3。
+      4、你接着需要判断User在对话历史当中的最后一句回复当中，是否User明确地表示要修改某项信息。若User在对话历史当中的最后一句回复当中，User明确表示了要修改某项信息，则将confirm字段的取值设置为0(修改信息)，将推理过程填充至reason字段。若User在对话历史当中的最后一句回复当中，没有明确表示要修改信息，则将confirm字段的取值设置为1(无法判断)，并将推理过程补全至reason字段。
+      
+      #对话历史
+      {conversation_history}
+      {salesperson_name}:
         """
 
     def process_inference_results(self, inference_results: Any) -> Any:
