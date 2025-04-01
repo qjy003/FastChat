@@ -445,16 +445,28 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         It then awaits the results of all asynchronous think operations, combines them into a
         single dictionary, and returns this dictionary for further processing.
         """
-        think_module_names = [model_name for model_name in think_module_inputs.keys() if model_name
-                              in self.think_modules.keys()]
+        think_module_names = [model_name for model_name, vals in think_module_inputs.items() if
+                              model_name in self.think_modules.keys() for i in (range(len(vals)) if
+                                                                                isinstance(vals, list) else range(
+                len([vals])))]
+        model_inputs = [vals[i] if isinstance(vals, list) else vals for model_name, vals in think_module_inputs.items()
+                        if
+                        model_name in self.think_modules.keys() for i in (range(len(vals)) if
+                                                                          isinstance(vals, list) else range(
+                len([vals])))]
         think_modules = [self.think_modules.get(model_name) for model_name in think_module_names]
-        async_task = [think_module.async_think(**think_module_inputs.get(think_module_names[i], think_module_inputs))
-                      for
-                      i, think_module in enumerate(think_modules)]
+        async_task = [think_modules[i].async_think(**model_input) for i, model_input in enumerate(model_inputs)]
         if is_return_async_tasks:
             return think_module_names, async_task
         results = await asyncio.gather(*async_task)
-        format_results = {model_name: results[i] for i, model_name in enumerate(think_module_names)}
+        format_results = {}
+        for i, model_name in enumerate(think_module_names):
+            if isinstance(think_module_inputs.get(model_name), list):
+                if model_name not in format_results:
+                    format_results[model_name] = []
+                format_results[model_name].append(results[i])
+            else:
+                format_results[model_name] = results[i]
         return format_results
 
     # Decorator to indicate that after the inference process, further processing will be applied to the results.
@@ -1134,8 +1146,15 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         query_results_ = results[len(think_tasks):]
 
         # Create a dictionary mapping module names to thinking results.
-        think_results = {think_module_names[i]: think_result for i, think_result in enumerate(think_results_)}
-
+        think_results = {}
+        for i, result in enumerate(think_results_):
+            module_name = think_module_names[i]
+            if isinstance(think_and_query_inputs.get(module_name), list):
+                if module_name not in think_results:
+                    think_results[module_name] = []
+                think_results[module_name].append(result)
+            else:
+                think_results[module_name] = result
         # Create a dictionary mapping module names to query results.
         query_results = {query_module_names[i]: query_result for i, query_result in
                          enumerate(query_results_)}
