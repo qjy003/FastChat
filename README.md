@@ -77,6 +77,7 @@
 - [PrivateModel-私有化部署大模型模块](#class-privatemodel-srcbaseprivatepy)
   - [inference-私有化部署大模型的推理过程](#def-inference-须用户继承实现)
 ### 其它
+- [支持延迟队列](#支持延迟队列)
 - [支持多模态提示词](#支持多模态提示词)
 - [批量测试功能](#批量测试功能)
 - [日志查服务](#日志查询功能)
@@ -871,6 +872,68 @@ def process_inference_results(self, inference_results: Any) -> Any:
     """
 ```
 
+#### def set_store_class (须用户继承实现)
+设置在http异步接口当中需要使用的寄存器类，设置后将在set_request_execution_delay方法当中支持使用相关的实例化对象
+```python
+def set_store_class(self):
+    """
+    向后台任务 HTTP 接口类添加一个抽象方法，用于设置存储类。用户需要在此接口中指定要使用的存储类。如果不需要存储，则应传递 None。
+    
+    Returns:
+        要使用的寄存器的类别。
+    """
+    pass
+```
+
+### def set_request_execution_delay (须用户继承实现)
+设置当前的异步任务实际相应推理的时间延迟，时间执行将在指定的时间延迟之后
+```python
+def set_request_execution_delay(self, req: dict, store: Store, scheduler: BackgroundScheduler) -> int:
+    """设置当前请求的推理延迟（以秒为单位）。
+
+    Args:
+        req: 此 HTTP 服务的当前请求对象。
+        store: 寄存器实例化对象
+        scheduler: 后台任务调度器
+
+    Returns:
+        执行请求的延迟时间（以秒为单位）。
+    """
+```
+
+### def set_task_id (须用户继承实现)
+设置当前异步请求对应离线任务的ID，若历史已有相同ID，则历史任务将被删除
+```python
+def set_task_id(self, req: dict, store: Store, scheduler: BackgroundScheduler) -> str:
+    """设置当前请求的任务 ID。如果请求包含现有任务 ID，则将清除具有该 ID 的上一个任务。
+
+    Args:
+        req: 当前网络服务的请求数据。
+        store: 寄存器实例化对象
+        scheduler: 后台任务调度器
+
+    Returns:
+        任务ID
+    """
+```
+
+### def update_scheduler (须用户继承实现)
+更新后台任务调度器，你可以根据自己的任务需要来对后台调度器进行处理
+```python
+def update_scheduler(self, req: dict, store: Store, scheduler: BackgroundScheduler) -> BackgroundScheduler:
+    """
+    更新异步后台任务调度器。注意，当前请求对应的任务已经在调度器中注册了。
+
+    Args:
+        req: 当前的请求体数据
+        store: 寄存器实例化对象
+        scheduler: 后台任务调度器
+
+    Returns:
+        更新后的后台任务调度器
+    """
+```
+
 ### class FrontInterface (src/base/front.py)
 前端界面交互，基于gradio实现的简单前端界面，便捷实现前端交互功能，便于快速落地应用并检验算法效果。
 
@@ -947,6 +1010,10 @@ def inference(self, prompt:str) -> str:
         私有化部署的模型通过推理所得到的推理结果
     """
 ```
+## 支持延迟队列
+我们提供的http_backend网络服务接口支持用户个性化设置实际执行推理的等待时间长度，我们可以更加灵活的控制服务器资源，响应业务需要。
+
+
 ## 支持多模态提示词
 在ThinkModule、ReplyModule当中编写提示词时，我们目前支持通过`{variable:image}`这种方式来标识variable这个变量为图片数据，可以参考下面示例，我们在提示词当中引入了`demo`这个图片数据类型的变量
 ```python

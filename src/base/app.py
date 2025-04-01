@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod, ABCMeta
 from typing import List, Type
 from typing import Any
 from typing import Union, Tuple, Dict, Callable
-
+from apscheduler.schedulers.background import BackgroundScheduler
 from src.base.http_backend import HttpBackendInterface
 from src.base.think import ThinkModule
 from src.base.reply import ReplyModule
@@ -175,6 +175,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         self.temperature = temperature  # Temperature setting for the GPT model
         self.openai_api_key = openai_api_key  # API keys for accessing the GPT model
         self.application_name = application_name  # Name of the chat application
+        self.background_scheduler = BackgroundScheduler()  # Background task scheduler
         self.paths = []
         self.query_modules = {}
         self.evaluate_modules = {}
@@ -870,6 +871,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         for module_name, module in self.http_backend_interfaces.items():
             module.initialize_interface()
             self.app.include_router(module)
+        if len(self.http_backend_interfaces) > 0:
+            self.background_scheduler.start()
         for module_name, module in self.front_interfaces.items():
             self.app = module.setup_app(self.app)
 
