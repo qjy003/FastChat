@@ -508,7 +508,11 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         original_stage = self.update_original_chat_stage(inference_inputs=kwargs, store=store)
 
         # Generate inputs required for the thinking and querying modules.
-        think_and_query_inputs = self.gen_think_and_query_inputs(store=store, inference_inputs=kwargs)
+        think_and_query_inputs = self.gen_think_and_query_inputs(store=store,
+                                                                 inference_inputs=kwargs,
+                                                                 think_results={},
+                                                                 query_results={},
+                                                                 current_round_index=0)
 
         # Perform the thinking and knowledge querying.
         if isinstance(think_and_query_inputs, dict):
