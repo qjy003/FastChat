@@ -147,7 +147,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                  model_name: str = None,
                  model: Type[PrivateModel] = None,
                  temperature: float = 0,
-                 verbose: bool = False):
+                 verbose: bool = False,
+                 workers: int = 4):
         """
         Initializes an instance of the ChatApplication class.
 
@@ -157,6 +158,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             openai_api_key (str): The API key for accessing large language models.
             model_name (str): The large language model used by the application. Each module can specify its own model.
             temperature (float): The temperature parameter for the large model, affecting the randomness of responses.
+            workers (int): The number of instances used as server.
 
         Initializes the chat application with the specified parameters, setting up the necessary infrastructure
         for its operation, including HTTP interfaces, front-end interfaces, and module management.
@@ -182,6 +184,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         self.verbose = verbose
         self.module_type = 'app'
         self.module_name = application_name
+        self.workers = workers
         if model is not None and model_name is not None:
             raise ValueError('You can not set model and model_name at the same time.')
         self.gpt_model_name = model_name
