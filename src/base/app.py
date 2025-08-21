@@ -77,8 +77,7 @@ class DecorateAllMethods(type):
                 if attr == 'reply' and is_over_write:
                     dct[attr] = convert_async_2_normal(value)
                 if attr == 'run' and is_over_write:
-                    dct[attr] = print_info_after_run(first_call_initialize(
-                        add_call_func_2_log(value)))
+                    dct[attr] = print_info_after_run(first_call_initialize(value))
                 if attr == 'update_store':
                     dct[attr] = store_result_in_attribute('store')(
                         return_type_must_be(Store)(add_call_func_2_log(value)))
@@ -95,11 +94,11 @@ class DecorateAllMethods(type):
                     # dct[attr] = convert_async_2_normal(async_then_call_func(async_return_type_must_be_callable(
                     #                         add_call_async_func_2_log(value))))
                     dct[attr] = then_call_async_func(return_type_must_be_callable(add_call_func_2_log(value)))
-                if attr == 'initialize':
-                    dct[attr] = add_call_func_2_log(value)
                 if attr == 'set_store_class':
                     dct[attr] = store_result_in_attribute('store_class')(
                         return_type_must_be(Store)(add_call_func_2_log(value)))
+                if attr == 'process_inference_results':
+                    dct[attr] = add_call_func_2_log(value)
                 if attr == 'load_store':
                     dct[attr] = store_result_in_attribute('store')(
                         return_type_must_be(Store)(add_call_func_2_log(value)))
@@ -336,6 +335,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @abstractmethod
     def update_chat_stage(self,
+                          request_id: str,
                           store: Store,
                           think_results: Union[Dict, list],
                           query_results: Union[Dict, list],
@@ -349,6 +349,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         based on the analysis and processing done by the think module.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             original_chat_stage: the chat stage before update
             inference_inputs: the request variables of the method inference
             store: The store
@@ -368,6 +369,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     @convert_async_2_normal
     @add_call_async_func_2_log
     async def think(self,
+                    request_id: str = "",
                     think_module_names: List = None,
                     is_return_async_tasks: bool = False, **kwargs) -> Union[Dict, list]:
         """
@@ -380,6 +382,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         processed appropriately after the thinking process is complete.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             is_return_async_tasks: is return the async tasks but not running
             think_module_names (List[str], optional): A list of think module names that are to be
                                                       executed during the thinking process. If not
@@ -418,7 +421,10 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     # @convert_async_2_normal
     @add_call_async_func_2_log
-    async def _think(self, is_return_async_tasks=True, **think_module_inputs) -> Union[dict, Tuple[list, list]]:
+    async def _think(self,
+                     request_id:str = "",
+                     is_return_async_tasks=True,
+                     **think_module_inputs) -> Union[dict, Tuple[list, list]]:
         """
         Executes the thinking and reasoning process within the chat application.
 
@@ -429,6 +435,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         processed appropriately after the thinking process is complete.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             is_return_async_tasks: is return the async tasks but not running
             think_module_names (List[str], optional): A list of think module names that are to be
                                                       executed during the thinking process. If not
@@ -458,7 +465,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                                                                           isinstance(vals, list) else range(
                 len([vals])))]
         think_modules = [self.think_modules.get(model_name) for model_name in think_module_names]
-        async_task = [think_modules[i].async_think(**model_input) for i, model_input in enumerate(model_inputs)]
+        async_task = [think_modules[i].async_think(request_id=request_id,**model_input) for i, model_input in enumerate(model_inputs)]
         if is_return_async_tasks:
             return think_module_names, async_task
         results = await asyncio.gather(*async_task)
@@ -501,18 +508,23 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         if len(args) > 0:
             raise ValueError("Positional parameters cannot be passed when calling the inference method!")
 
+        # Get the HTTP service request ID
+        request_id = kwargs.get("request_id", "") if "request_id" in kwargs else args[0]
+        request_inputs = kwargs.get("request_inputs", {}) if "request_inputs" in kwargs else args[1]
+
         # Initialize the Store class object.
-        store = self.set_store_class()()
+        store = self.set_store_class(request_id=request_id)()
 
         # load the store
-        self.load_store(inference_inputs=kwargs, store=store)
+        self.load_store(request_id=request_id, inference_inputs=request_inputs, store=store)
 
         # Update the current original chat stage with the inference results.
-        original_stage = self.update_original_chat_stage(inference_inputs=kwargs, store=store)
+        original_stage = self.update_original_chat_stage(request_id=request_id, inference_inputs=request_inputs, store=store)
 
         # Generate inputs required for the thinking and querying modules.
-        think_and_query_inputs = self.gen_think_and_query_inputs(store=store,
-                                                                 inference_inputs=kwargs,
+        think_and_query_inputs = self.gen_think_and_query_inputs(request_id=request_id,
+                                                                 store=store,
+                                                                 inference_inputs=request_inputs,
                                                                  think_results={},
                                                                  query_results={},
                                                                  current_round_index=0)
@@ -523,7 +535,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             think_and_query_inputs = self.get_avaliable_think_and_query_modules(
                 think_and_query_inputs=think_and_query_inputs,
                 current_stage=original_stage)
-            think_results, query_results = await self._think_and_query(**think_and_query_inputs)
+            think_results, query_results = await self._think_and_query(request_id=request_id,**think_and_query_inputs)
         elif isinstance(think_and_query_inputs, list) and len(think_and_query_inputs) > 0:
             # filter the unused think modules
             rounds = len(think_and_query_inputs)
@@ -532,8 +544,9 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             for i in range(rounds):
                 if i != 0:
                     # Generate inputs required for the thinking and querying modules.
-                    think_and_query_inputs = self.gen_think_and_query_inputs(store=store,
-                                                                             inference_inputs=kwargs,
+                    think_and_query_inputs = self.gen_think_and_query_inputs(request_id=request_id,
+                                                                             store=store,
+                                                                             inference_inputs=request_inputs,
                                                                              think_results=think_results,
                                                                              query_results=query_results,
                                                                              current_round_index=i)
@@ -543,7 +556,8 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                     think_and_query_inputs=think_and_query_inputs,
                     current_stage=original_stage,
                     current_round_index=i)
-                cur_think_results, cur_query_results = await self._think_and_query(**think_and_query_input)
+                cur_think_results, cur_query_results = await self._think_and_query(request_id=request_id,
+                                                                                   **think_and_query_input)
                 think_results.append(cur_think_results)
                 query_results.append(cur_query_results)
         else:
@@ -551,64 +565,70 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             query_results = {}
 
         # Update the global store object with the new results.
-        store = self.update_store(store=store,
+        store = self.update_store(request_id=request_id,
+                                  store=store,
                                   think_results=think_results,
                                   query_results=query_results,
                                   original_chat_stage=original_stage,
-                                  inference_inputs=kwargs)
+                                  inference_inputs=request_inputs)
 
         # Update the chat stage based on the new store and results.
-        current_stage = self.update_chat_stage(store=store,
+        current_stage = self.update_chat_stage(request_id=request_id,
+                                               store=store,
                                                think_results=think_results,
                                                query_results=query_results,
                                                original_chat_stage=original_stage,
-                                               inference_inputs=kwargs)
+                                               inference_inputs=request_inputs)
 
         # Prepare the inputs for the chat module.
         if current_stage in self.reply_modules:
-            chat_module_inputs = self.gen_reply_inputs(current_chat_stage=current_stage,
+            chat_module_inputs = self.gen_reply_inputs(request_id=request_id,
+                                                       current_chat_stage=current_stage,
                                                        store=store,
                                                        think_results=think_results,
                                                        query_results=query_results,
                                                        original_chat_stage=original_stage,
-                                                       inference_inputs=kwargs)
+                                                       inference_inputs=request_inputs)
         else:
             chat_module_inputs = current_stage
 
         if isinstance(chat_module_inputs, dict):
             # Execute the reply generation of the chat module.
-            reply_results = await self._reply(**chat_module_inputs)
+            reply_results = await self._reply(request_id=request_id,**chat_module_inputs)
         else:
             reply_results = chat_module_inputs
 
         # Evaluate the quality of the generated reply.
-        evaluate_inputs = self.gen_evaluate_inputs(reply_results=reply_results,
+        evaluate_inputs = self.gen_evaluate_inputs(request_id=request_id,
+                                                   reply_results=reply_results,
                                                    current_chat_stage=current_stage,
                                                    store=store,
                                                    think_results=think_results,
                                                    query_results=query_results,
                                                    original_chat_stage=original_stage,
-                                                   inference_inputs=kwargs)
+                                                   inference_inputs=request_inputs)
         if isinstance(evaluate_inputs, dict):
-            evaluate_results = await self._evaluate(**evaluate_inputs)
+            evaluate_results = await self._evaluate(request_id=request_id, **evaluate_inputs)
         else:
             evaluate_results = evaluate_inputs
 
         # Process the inference results and generate the final output.
-        final_results = self.process_inference_results(evaluate_results=evaluate_results,
+        final_results = self.process_inference_results(request_id=request_id,
+                                                       evaluate_results=evaluate_results,
                                                        reply_results=reply_results,
                                                        current_chat_stage=current_stage,
                                                        store=store,
                                                        think_results=think_results,
                                                        query_results=query_results,
                                                        original_chat_stage=original_stage,
-                                                       inference_inputs=kwargs)
+                                                       inference_inputs=request_inputs)
 
         # Return the final results of the inference process.
         return final_results
 
     @abstractmethod
     def gen_evaluate_inputs(self,
+                            request_id: str,
                             reply_results: Any,
                             current_chat_stage: str,
                             store: Store,
@@ -625,6 +645,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         a grading system where 0 represents 'dangerous', 1 represents 'concerning', and 2 represents 'safe'.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             inference_inputs: the input parameters of the inference function
             original_chat_stage: Tge chat stage before update
             current_chat_stage: The chat stage after update
@@ -648,7 +669,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         pass
 
     @add_call_async_func_2_log
-    async def _reply(self, **chat_module_inputs) -> str:
+    async def _reply(self, request_id:str = "", **chat_module_inputs) -> str:
         """
         Generates a reply using the dialogue response module corresponding to the current stage.
 
@@ -658,6 +679,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         to assess their safety and appropriateness.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             **chat_module_inputs: Arbitrary keyword arguments that are passed to the reply module to generate a
             response. These could include context, user input, and other relevant data needed for the reply.
 
@@ -676,8 +698,9 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         if self.current_stage not in self.reply_modules:
             raise ValueError(
                 f"Current dialogue stage {self.current_stage} is not present in the reply modules of the application")
-        result = await self.reply_modules[self.current_stage].async_reply(
-            **chat_module_inputs.get(self.current_stage, chat_module_inputs))
+        result = await self.reply_modules[self.current_stage].async_reply(request_id=request_id,
+                                                                          **chat_module_inputs.get(self.current_stage,
+                                                                                                   chat_module_inputs))
         return result
 
     @convert_async_2_normal
@@ -753,6 +776,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @abstractmethod
     def process_inference_results(self,
+                                  request_id: str,
                                   evaluate_results: Dict,
                                   reply_results: Any,
                                   current_chat_stage: str,
@@ -771,6 +795,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         the results are returned to the user or another system component.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             original_chat_stage: The chat stage before update
             current_chat_stage: The current stage of the conversation
             inference_inputs: parameters received by the inference method
@@ -823,7 +848,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @print_info_after_run
     @first_call_initialize
-    @add_call_func_2_log
+    # @add_call_func_2_log
     def run(self):
         """
         Starts the chat application service by first initializing all dialogue modules, thinking modules,
@@ -1068,7 +1093,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         return format_results
 
     # @convert_async_2_normal
-    async def _query(self, is_return_async_tasks: bool = True, **query_module_inputs) -> Union[Dict, Tuple[List,
+    async def _query(self, request_id: str, is_return_async_tasks: bool = True, **query_module_inputs) -> Union[Dict, Tuple[List,
                                                                                                            List[
                                                                                                                asyncio.Task]]]:
         """
@@ -1076,6 +1101,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         phase of a conversation application's lifecycle and runs concurrently.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             is_return_async_tasks (bool): Whether to return a list of asynchronous tasks instead of the actual query
             results.
             query_module_inputs (dict): Input parameters for the knowledge base query modules.
@@ -1096,6 +1122,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
         # Create a list of asyncio tasks for each query module
         tasks = [query_module['module'].async_query(
+            request_id=request_id,
             query_content=get_dict_value(query_module_inputs,
                                          [query_module_names[i],
                                           query_module['query_parameter_name']]),
@@ -1120,13 +1147,14 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         return format_results
 
     @add_call_async_func_2_log
-    async def _think_and_query(self, **think_and_query_inputs):
+    async def _think_and_query(self, request_id: str, **think_and_query_inputs):
         """
         Concurrently executes thinking and reasoning operations along with knowledge base queries.
         The results are then passed back to the process_think_results and process_query_results methods,
         before exiting the decorator. Finally, the update_chat_stage method is called.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             think_module_names: A list of names of modules to use for thinking.
             query_module_names: A list of names of modules to use for querying the knowledge database.
             **kwargs: Additional keyword arguments to be passed to the think and query operations.
@@ -1135,11 +1163,13 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             A tuple containing two dictionaries: one with the thinking results and one with the query results.
         """
         # Perform thinking operations asynchronously and return the tasks.
-        think_module_names, think_tasks = await self._think(is_return_async_tasks=True,
+        think_module_names, think_tasks = await self._think(request_id=request_id,
+                                                            is_return_async_tasks=True,
                                                             **think_and_query_inputs)
 
         # Perform knowledge base queries asynchronously and return the tasks.
-        query_module_names, query_tasks = await self._query(is_return_async_tasks=True,
+        query_module_names, query_tasks = await self._query(request_id=request_id,
+                                                            is_return_async_tasks=True,
                                                             **think_and_query_inputs)
 
         # Combine the thinking and querying tasks.
@@ -1170,12 +1200,16 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         return think_results, query_results
 
     @abstractmethod
-    def update_original_chat_stage(self, inference_inputs: Dict, store: Store) -> str:
+    def update_original_chat_stage(self,
+                                   request_id: str,
+                                   inference_inputs: Dict,
+                                   store: Store) -> str:
         """
         Determines the original dialogue stage at the time of the request, which is crucial for the algorithm.
         This method requires you to analyze the sent request to identify the original dialogue stage and return it.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             inference_inputs: The results of the inference performed on the request, which should contain
                 information to deduce the original chat stage.
             store: the data and methods saving object
@@ -1190,6 +1224,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @abstractmethod
     def update_store(self,
+                     request_id: str,
                      store: Store,
                      think_results: Union[Dict, list],
                      query_results: Union[Dict, list],
@@ -1201,6 +1236,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         Store class.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             original_chat_stage: The original chat stage before updating.
             store: A global storage object that holds the state of the system.
             think_results: The outcomes of the reasoning process.
@@ -1218,6 +1254,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @abstractmethod
     def gen_reply_inputs(self,
+                         request_id: str,
                          current_chat_stage: str,
                          store: Store,
                          think_results: Union[Dict, list],
@@ -1230,6 +1267,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         executing the `reply` method.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             original_chat_stage: The chat stage before update.
             store: The global storage object containing the state of the system.
             current_chat_stage: A string representing the current dialogue stage.
@@ -1249,6 +1287,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
     @convert_async_2_normal
     @add_call_async_func_2_log
     async def evaluate(self,
+                       request_id: str = "",
                        is_return_async_tasks=False,
                        evaluate_module_names: list = None,
                        **kwargs) -> Union[Dict, Tuple[list, list]]:
@@ -1256,6 +1295,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         Evaluates the results using the provided inputs for each module.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             is_return_async_tasks: A boolean indicating whether to return the asynchronous tasks.
             evaluate_module_names: A list of names of the evaluation modules to be executed. If None, all modules will
             be executed.
@@ -1301,12 +1341,14 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @add_call_async_func_2_log
     async def _evaluate(self,
+                        request_id: str = "",
                         is_return_async_tasks=False,
                         **kwargs) -> Union[Dict, Tuple[list, list]]:
         """
         Evaluates the results using the provided inputs for each module.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             is_return_async_tasks: A boolean indicating whether to return the asynchronous tasks.
             kwargs: the inputs of all evaluate modules.
 
@@ -1329,6 +1371,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         # Create a list of asynchronous evaluation tasks for each module.
         async_task = [
             evaluate_module.async_evaluate(
+                request_id=request_id,
                 **get_dict_values(kwargs, [evaluate_module_names[i]], evaluate_module.input_variables)
             )
             for i, evaluate_module in enumerate(evaluate_modules)
@@ -1349,6 +1392,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
 
     @abstractmethod
     def gen_think_and_query_inputs(self,
+                                   request_id: str,
                                    store: Store,
                                    inference_inputs: Dict,
                                    think_results: Union[Dict, list] = [],
@@ -1359,6 +1403,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         the knowledge query module.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             store: The storage of key values and attributes.
             inference_inputs: The parameters passed to the inference method.
             think_results: The reasoning results of the thinking module that have been obtained so far
@@ -1376,12 +1421,13 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         pass
 
     @abstractmethod
-    def request_preprocess(self, request_inputs: Dict) -> Callable:
+    def request_preprocess(self, request_id: str, request_inputs: Dict) -> Callable:
         """
         This method is triggered when a request is sent to the current application. It is responsible for preprocessing
         the request before specifying which method should handle it.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             request_inputs (Dict): A dictionary containing the inputs of the request. This should include all necessary
                 data required to process the request.
 
@@ -1477,7 +1523,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             return False
 
     @abstractmethod
-    def set_store_class(self) -> type:
+    def set_store_class(self, request_id: str) -> type:
         """
         Sets the class type for the storage object 'store'.
 
@@ -1487,13 +1533,15 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         For example, if your storage class is `MyStorageClass`, you would implement
         this method to simply `return MyStorageClass`.
 
+        Args:
+            request_id: the id of the http request, which helps to locate the log details.
         Returns:
             type: The class type of the storage object.
         """
         pass
 
     @abstractmethod
-    def load_store(self, inference_inputs: Dict, store: Store) -> Store:
+    def load_store(self, request_id: str, inference_inputs: Dict, store: Store) -> Store:
         """
         Reloads the `store` object based on the request data received for the first time.
 
@@ -1503,6 +1551,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
         performing further operations.
 
         Args:
+            request_id: the id of the http request, which helps to locate the log details.
             inference_inputs: A dictionary containing the parameters for the inference method call. This dict
                               provides the necessary information required to update the `store`.
             store: An instance of a `Store` object that needs to be reloaded or updated. This object represents
