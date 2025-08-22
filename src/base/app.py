@@ -465,7 +465,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                                                                           isinstance(vals, list) else range(
                 len([vals])))]
         think_modules = [self.think_modules.get(model_name) for model_name in think_module_names]
-        async_task = [think_modules[i].async_think(request_id=request_id,**model_input) for i, model_input in enumerate(model_inputs)]
+        async_task = [think_modules[i].async_think(request_id=request_id, **model_input) for i, model_input in enumerate(model_inputs)]
         if is_return_async_tasks:
             return think_module_names, async_task
         results = await asyncio.gather(*async_task)
@@ -872,6 +872,7 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                        documented by the implementations of the initialization and server startup procedures.
         """
         llms = {}
+        llm_types = {}
         all_modules = {}
         all_modules.update(self.reply_modules)
         all_modules.update(self.think_modules)
@@ -881,13 +882,15 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
             if hasattr(module, 'model') and getattr(module, 'model') is not None and \
                     getattr(module, 'model').__name__ not in llms:
                 llms[getattr(module, 'model').__name__] = getattr(module, 'model')()
+                llm_types[getattr(module, 'model').__name__] = "private"
                 llm = llms.get(getattr(module, 'model').__name__, None)
-                module.setup(llm=llm, verbose=self.verbose)
+                module.setup(llm=llm, llm_type="private", verbose=self.verbose)
                 continue
             if self.gpt_model_name is None and getattr(module, 'model_name', None) is None:
                 if self.gpt_model.__name__ not in llms:
                     llms[self.gpt_model.__name__] = self.gpt_model()
-                module.setup(llm=llms[self.gpt_model.__name__], verbose=self.verbose)
+                llm_types[self.gpt_model.__name__] = "private"
+                module.setup(llm=llms[self.gpt_model.__name__], llm_type="private", verbose=self.verbose)
                 continue
             llm_key = (getattr(module, 'model_name', self.gpt_model_name),
                        getattr(module, 'temperature', self.temperature),
@@ -897,9 +900,11 @@ class ChatApplication(ABC, metaclass=CombinedMeta):
                                              temperature=getattr(module, 'temperature', self.temperature),
                                              openai_api_key=getattr(module, 'openai_api_key', self.openai_api_key),
                                              )
+                llm_types[llm_key] = "llm_gate"
 
             llm = llms[llm_key] if llm_key in llms else None
-            module.setup(llm=llm, verbose=self.verbose)
+            llm_type = llm_types[llm_key] if llm_key in llms else None
+            module.setup(llm=llm, llm_type=llm_type, verbose=self.verbose)
         if self.app is None:
             self.app = FastAPI()
         log_http_service = LogHttpService()
