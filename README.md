@@ -121,8 +121,10 @@ def __init__(self,
 指定对话应用当中所使用的逻辑与数据寄存的类
 
 ```python
-def set_store_class(self) -> type:
+def set_store_class(self, request_id: str) -> type:
     """
+    Args:
+        request_id: http请求ID(便于索引查询日志记录)
     Returns:
         对话应用当中所使用的逻辑与数据寄存的类
     """
@@ -258,11 +260,13 @@ def add_query_module(self,
 
 ```python
 async def think(self,
+                request_id: str,
                 think_module_names: List[str] = None,
                 is_return_async_tasks: bool = False, 
                 **kwargs) -> Union[Dict, list]:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         think_module_names: 指定参与本次思考推理的模块的模块名称标识列表
         is_return_async_tasks: 是否返回异步执行的任务列表(False时返回异步执行的结果)
         kwargs: 指定的思考推理模块的提示词当中的占位符对应的实际取值
@@ -276,11 +280,13 @@ async def think(self,
 
 ```python
 async def query(self,
+                request_id: str,
                 query_module_names: List[str] = None,
                 is_return_async_tasks: bool = False,
                 **kwargs) -> Union[Dict[str, Any], List[Any]]:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         query_module_names: 当前执行知识查询的知识查询模块的名称标识列表
         is_return_async_tasks: 是否返回异步执行的任务列表(False时返回异步执行的结果)
         kwargs: 各个知识查询模块的执行查询方法的入参参数
@@ -292,9 +298,12 @@ async def query(self,
 #### def reply
 执行生成回复内容，该方法会启动current_stage变量所指定的对话回复模块来生成回复
 ```python
-async def reply(self, **chat_module_inputs) -> str
+async def reply(self, 
+                request_id: str,
+                **chat_module_inputs) -> str
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         chat_module_inputs: 各对话模块儿的提示词内的占位符所对应的实际取值
     
     Returns: 
@@ -305,9 +314,12 @@ async def reply(self, **chat_module_inputs) -> str
 #### def request_preprocess (须用户继承实现)
 指定方法负责接收到前端交互、http接口模块的调用请求，通常使用self.inference即可，你也可以自己实现一个新的方法来负责处理用户的请求。
 ```python
-def request_preprocess(self, request_inputs: Dict) -> Callable:
+def request_preprocess(self,
+                       request_id: str,
+                       request_inputs: Dict) -> Callable:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         request_inputs: 请求核心应用服务的参数
     Returns:
         指定负责处理当前请求的方法
@@ -323,9 +335,12 @@ def inference(self, *args, **kwargs) -> Any:
 #### def update_original_chat_stage (须用户继承实现)
 返回的结果是执行inference的开始时的对话阶段，需要从请求的参数inference_inputs当中去获取原始的对话阶段。
 ```python
-def update_original_chat_stage(self, inference_inputs: Dict) -> str:
+def update_original_chat_stage(self, 
+                               request_id: str,
+                               inference_inputs: Dict) -> str:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_inputs: 执行inference方法时的入参参数
     Returns:
           开始执行inference方法推理时的对话阶段
@@ -335,9 +350,13 @@ def update_original_chat_stage(self, inference_inputs: Dict) -> str:
 #### def load_store (须用户继承实现)
 载入对话应用当中所使用的逻辑与数据寄存的对象
 ```python
-def load_store(self, inference_inputs: Dict, store: Store) -> Store:
+def load_store(self,
+               request_id: str,
+               inference_inputs: Dict, 
+               store: Store) -> Store:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_inputs: 执行inference推理方法的入参参数
         store: 逻辑与数据寄存的对象，存活于执行inference推理的整个生命周期内
     Returns:
@@ -349,10 +368,12 @@ def load_store(self, inference_inputs: Dict, store: Store) -> Store:
 生成各个思考推理模块的提示词占位符的实际取值、各个知识查询模块的入参参数
 ```python
 def gen_think_and_query_inputs(self, 
+                               request_id: str,
                                store: Store, 
                                inference_inputs: Dict) -> Dict:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         store: 逻辑与数据寄存的对象，存活于执行inference推理的整个生命周期内
         inference_inputs: 执行inference推理方法的入参参数
     Returns:
@@ -364,6 +385,7 @@ def gen_think_and_query_inputs(self,
 在执行完思考推理和知识查询之后的这一时间节点，基于思考推理、知识查询的结果来更新store对象，将核心的数据寄存在store当中，便于在后续的特定时间节点来使用。
 ```python
 def update_store(self,
+                 request_id: str,
                  store: Store,
                  think_results: Dict,
                  query_results: Dict,
@@ -371,6 +393,7 @@ def update_store(self,
                  inference_inputs: Dict) -> Store:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         store: 逻辑与数据寄存的对象，存活于执行inference推理的整个生命周期内
         think_results: 各个思考推理模块执行所返回的结果
         query_results: 各个知识查询模块执行所返回的结果
@@ -385,14 +408,16 @@ def update_store(self,
 生成各个对话回复模块的提示词当中的各占位符所对应的实际取值，返回结果将作为调用当前current_chat_stage所指定的对话回复模块的占位符的实际取值，进而执行对话回复模块来生成回复结果。
 ```python
 def gen_reply_inputs(self,
-                           current_chat_stage: str,
-                           store: Store,
-                           think_results: Dict,
-                           query_results: Any,
-                           original_chat_stage: str,
-                           inference_inputs: Dict) -> Dict:
+                     request_id: str,
+                     current_chat_stage: str,
+                     store: Store,
+                     think_results: Dict,
+                     query_results: Any,
+                     original_chat_stage: str,
+                     inference_inputs: Dict) -> Dict:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         current_chat_stage: 当前更新后并对话阶段，也即负责执行生成回复结果的对话回复模块的名称标识
         store: 逻辑与数据寄存的对象，存活于执行inference推理的整个生命周期内
         think_results: 各个思考推理模块执行所返回的结果
@@ -408,6 +433,7 @@ def gen_reply_inputs(self,
 在完成对话内容的生成后，自动调用该方法返回结果作为各结果评估模块的占位符输入，当未配置结果评估模块时，跳过执行结果评估，直接将当前方法返回的结果传递给下一步骤的process_inference_results方法
 ```python
 def gen_evaluate_inputs(self,
+                        request_id: str,
                         reply_results: Any,
                         current_chat_stage: str,
                         store: Store,
@@ -418,6 +444,7 @@ def gen_evaluate_inputs(self,
                         ) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         reply_results: 对话回复模块执行返回的结果
         current_chat_stage: 当前的对话阶段(以对话回复模块的标识作为对话阶段的命名标识)
         store: 逻辑与数据寄存的对象，存活于执行inference推理的整个生命周期内
@@ -435,6 +462,7 @@ def gen_evaluate_inputs(self,
 执行inference对话推理的最后一个时间节点，你可以在这个方法当中基于各个时间节点产出的完整数据来组装生成一个符合前端交互界面及http接口模块所需要的返回结果。
 ```python
 def process_inference_results(self,
+                              request_id: str,
                               evaluate_results: Dict,
                               reply_results: Any,
                               current_chat_stage: str,
@@ -445,6 +473,7 @@ def process_inference_results(self,
                               inference_inputs: Dict) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         evaluate_results: 回复结果评估模块执行返回的结果(未配置时，方法gen_evaluate_inputs方法的返回结果直接传递给该参数)
         reply_results: 各对话回复模块执行所返回的结果
         current_chat_stage: 当前最新的对话阶段(以执行对话回复的模块的名称标识作为对话阶段的标识)
@@ -463,11 +492,13 @@ def process_inference_results(self,
 执行对于回复结果的评估
 ```python
 async def evaluate(self,
+                   request_id: str,
                    evaluate_module_inputs: Dict,
                    is_return_async_tasks=False,
                    evaluate_module_names: list = None) -> Union[Dict, Tuple[list, list]]:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         evaluate_module_inputs
     """
 ```
@@ -508,9 +539,12 @@ def initialize_prompt(self) -> str:
 #### def async_think 
 异步执行思考推理
 ```python
-async def async_think(self, **kwargs) -> Any:
+async def async_think(self, 
+                      request_id: str,
+                      **kwargs) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 思考推理模块提示词内占位符对应的实际取值
     Returns:
         当前模块执行思考推理的结果
@@ -520,9 +554,12 @@ async def async_think(self, **kwargs) -> Any:
 #### def think
 执行推理思考
 ```python
-def think(self, **kwargs) -> Any:
+def think(self, 
+          request_id: str,
+          **kwargs) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 思考推理模块提示词内占位符对应的实际取值
     Returns:
         当前模块执行思考推理的结果
@@ -532,9 +569,12 @@ def think(self, **kwargs) -> Any:
 #### def process_inference_results (须用户继承实现)
 处理大模型执行所返回的结果，处理后的结果作为当前模块执行思考推理所返回的结果。
 ```python
-def process_inference_results(self, inference_results: Any) -> Any:
+def process_inference_results(self,
+                              request_id: str,
+                              inference_results: Any) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 大模型执行所返回的结果
     Returns:
         当前模块执行思考推理最终返回的结果
@@ -587,6 +627,7 @@ def __init__(self,
 异步执行知识查询
 ```python
 async def async_query(self,
+                      request_id: str,
                       query_content: str,
                       query_field: str,
                       top_k: int,
@@ -594,6 +635,7 @@ async def async_query(self,
                       min_score: float = None):
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         query_content: 用于查询的内容
         query_field: 用于和查询内容进行向量相似度比对的字段
         top_k: 查询返回的最相似的结果数量
@@ -608,6 +650,7 @@ async def async_query(self,
 执行知识查询
 ```python
 def query(self,
+          request_id: str,
           query_content: str,
           query_field: str,
           top_k: int,
@@ -615,6 +658,7 @@ def query(self,
           min_score: float = None)->Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         query_content: 用于查询的内容
         query_field: 用于和查询内容进行向量相似度比对的字段
         top_k: 查询返回的最相似的结果数量
@@ -628,9 +672,13 @@ def query(self,
 #### def process_query_results
 处理知识查询的结果，处理之后的结果返还给后台核心应用来使用
 ```python
-def process_query_results(self, query_content: str, query_results: list) -> Any:
+def process_query_results(self,
+                          request_id: str,
+                          query_content: str, 
+                          query_results: list) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         query_content: 查询内容
         query_results: 知识库查询的结果
     Returns:
@@ -673,9 +721,12 @@ def initialize_prompt(self) -> str:
 #### async def async_reply
 异步执行对话回复
 ```python
-async def async_reply(self, **kwargs) -> Any:
+async def async_reply(self, 
+                      request_id: str,
+                      **kwargs) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 对话回复模块的提示词内各占位符对应的实际取值
     Returns:
         大模型执行生成的初步的回复内容
@@ -685,9 +736,12 @@ async def async_reply(self, **kwargs) -> Any:
 #### def reply
 执行对话回复
 ```python
-def reply(self, **kwargs) -> Any:
+def reply(self, 
+          request_id: str,
+          **kwargs) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 对话回复模块的提示词内各占位符对应的实际取值
     Returns:
         大模型执行生成的初步的回复内容
@@ -697,9 +751,12 @@ def reply(self, **kwargs) -> Any:
 #### def process_inference_results (须由用户继承实现)
 处理大模型执行所返回的结果，处理后的结果作为当前模块执行思考推理所返回的结果。
 ```python
-def process_inference_results(self, inference_results: Any) -> Any:
+def process_inference_results(self,
+                              request_id: str,
+                              inference_results: Any) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 大模型执行所返回的结果
     Returns:
         当前模块执行思考推理最终返回的结果
@@ -753,9 +810,12 @@ def initialize_prompt(self) -> str:
 #### def async_evaluate
 异步执行回复结果评估
 ```python
-async def async_evaluate(self, **kwargs):
+async def async_evaluate(self, 
+                         request_id: str,
+                         **kwargs):
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 回复评估模块的提示词内各占位符对应的实际取值
     Returns:
         大模型执行生成的回复评估结果
@@ -764,9 +824,12 @@ async def async_evaluate(self, **kwargs):
 #### def evaluate
 执行回复结果评估
 ```python
-def evaluate(self, **kwargs):
+def evaluate(self, 
+             request_id: str,
+             **kwargs):
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         kwargs: 回复评估模块的提示词内各占位符对应的实际取值
     Returns:
         大模型执行生成的回复评估结果
@@ -776,9 +839,12 @@ def evaluate(self, **kwargs):
 #### def process_inference_results (须由用户继承实现)
 处理大模型执行所返回的结果，处理后的结果作为当前模块执行思考推理所返回的结果。
 ```python
-def process_inference_results(self, inference_results: Any) -> Any:
+def process_inference_results(self,
+                              request_id: str,
+                              inference_results: Any) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 大模型执行所返回的结果
     Returns:
         当前模块执行思考推理最终返回的结果
@@ -814,9 +880,10 @@ def define_request_format(self) -> type:
 #### def gen_request (须用户继承实现)
 处理http服务接口接收到的网络请求，处理返回的结果作为请求核心应用的参数
 ```python
-def gen_request(self, req: Dict) -> Dict:
+def gen_request(self, request_id: str, req: Dict) -> Dict:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         req: 接口的网络请求数据
     Returns:
         向对话核心应用转发的请求参数
@@ -826,9 +893,12 @@ def gen_request(self, req: Dict) -> Dict:
 #### def process_inference_results (须用户继承实现)
 处理核心应用接收请求后执行的结果，处理后的结果作为http服务接口最终返回的结果
 ```python
-def process_inference_results(self, inference_results: Any) -> Any:
+def process_inference_results(self,
+                              request_id: str,
+                              inference_results: Any) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 核心应用推理并返回的结果
     Returns:
         http服务接口最终返回的结果
@@ -851,9 +921,10 @@ def define_request_format(self) -> type:
 #### def gen_request (须用户继承实现)
 处理http服务接口接收到的网络请求，处理返回的结果作为请求核心应用的参数
 ```python
-def gen_request(self, req: Dict) -> Dict:
+def gen_request(self, request_id: str, req: Dict) -> Dict:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         req: 接口的网络请求数据
     Returns:
         向对话核心应用转发的请求参数
@@ -863,9 +934,12 @@ def gen_request(self, req: Dict) -> Dict:
 #### def process_inference_results (须用户继承实现)
 处理核心应用接收请求后执行的结果，处理后的结果作为http服务接口最终返回的结果
 ```python
-def process_inference_results(self, inference_results: Any) -> Any:
+def process_inference_results(self,
+                              request_id: str,
+                              inference_results: Any) -> Any:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 核心应用推理并返回的结果
     Returns:
         http服务接口最终返回的结果
@@ -950,11 +1024,13 @@ def set_store_class(self) -> type:
 基于聊天内容和前端寄存的数据，生成向后台核心应用请求的参数数据
 ```python
 def gen_request(self, 
+                request_id: str,
                 chat_contents: List, 
                 user_reply: str, 
                 store: Store) -> Dict:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         chat_contents: 前端聊天框内的聊天数据
         user_reply: 用户在前端最新输入的内容
         store: 前端的逻辑与数据寄存器对象(生命周期为一次完整的多轮聊天)
@@ -967,10 +1043,12 @@ def gen_request(self,
 更新前端的逻辑与数据寄存器对象
 ```python
 def update_store(self, 
+                 request_id: str,
                  inference_results: Any, 
                  store: Store) -> Store:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 后台核心应用执行返回的结果
         store: 前端的逻辑与数据寄存器对象(生命周期为一次完整的多轮聊天)
     Returns:
@@ -982,10 +1060,12 @@ def update_store(self,
 处理后台核心应用执行返回的结果，处理后的结果作为在前端聊天框内进行展示的内容。
 ```python
 def process_inference_results(self, 
+                              request_id: str,
                               inference_results: Any, 
                               store: Store) -> str:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         inference_results: 后台核心应用执行返回的结果
         store: 前端的逻辑与数据寄存器对象(此时已经更新，生命周期为一次完整的多轮聊天)
     Returns:
@@ -1002,9 +1082,10 @@ def process_inference_results(self,
 
 #### def inference (须用户继承实现)
 ```python
-def inference(self, prompt:str) -> str:
+def inference(self, request_id: str, prompt:str) -> str:
     """
     Args:
+        request_id: http请求ID(便于索引查询日志记录)
         prompt: 提示词内容
     Returns:
         私有化部署的模型通过推理所得到的推理结果
@@ -1042,7 +1123,7 @@ class UnderstandImage(ThinkModule):
       {salesperson_name}:
         """
 
-    def process_inference_results(self, inference_results: Any) -> Any:
+    def process_inference_results(self, request_id: str, inference_results: Any) -> Any:
         return inference_results
 ```
 然后你可以参考下面的示例来执行为变量`demo`的实际赋值，直接将图片的二进制数据赋值到demo字段即可。
